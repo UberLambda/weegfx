@@ -5,6 +5,7 @@ SpaceBeforeParens: Never
 IndentPPDirectives: AfterHash
 
 AllowShortBlocksOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: true
 
 IndentCaseLabels: false
