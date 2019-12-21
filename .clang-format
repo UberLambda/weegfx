@@ -10,6 +10,9 @@ AllowShortFunctionsOnASingleLine: true
 IndentCaseLabels: false
 AccessModifierOffset: -4
 
+BraceWrapping:
+    AfterExternBlock: false
+
 SpaceBeforeCtorInitializerColon: true
 ConstructorInitializerIndentWidth: 4
 BreakConstructorInitializersBeforeComma: false
