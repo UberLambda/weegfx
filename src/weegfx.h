@@ -11,26 +11,25 @@ extern "C" {
 #include "weegfx/types.h"
 
 /// A function that reads a rectangle of pixels from the screen to `buf`.
-typedef void (*WGFXreadRectPFN)(WGFX_SIZET x, WGFX_SIZET y, WGFX_SIZET w, WGFX_SIZET h, WGFX_U8 *buf, void *userPtr);
+typedef void (*WGFXreadRectPFN)(unsigned x, unsigned y, unsigned w, unsigned h, WGFX_U8 *buf, void *userPtr);
 
 /// A function that copies a rectangle of pixels from `buf` to the screen.
-typedef void (*WGFXwriteRectPFN)(WGFX_SIZET x, WGFX_SIZET y, WGFX_SIZET w, WGFX_SIZET h, const WGFX_U8 *buf, void *userPtr);
+typedef void (*WGFXwriteRectPFN)(unsigned x, unsigned y, unsigned w, unsigned h, const WGFX_U8 *buf, void *userPtr);
 
 /// An instance of weegfx.
 typedef struct
 {
     /// Width and height of the screen in pixels.
-    WGFX_SIZET width, height;
+    unsigned width, height;
 
     /// Bytes per pixel as stored in the screen framebuffer and scratch buffer.
     unsigned bpp;
 
-    /// Size in bytes of the scratch buffer.
-    /// WARNING: This should be a multiple of `bpp`!
-    WGFX_SIZET sbSize;
+    /// Size in _pixels_ of the scratch buffer.
+    WGFX_SIZET scratchSize;
 
     /// The scratch buffer; must be at least `fbSize` bytes in size.
-    WGFX_U8 *sbData;
+    WGFX_U8 *scratchData;
 
     /// Used to read pixel data from the actual screen.
     WGFXreadRectPFN readRect;
@@ -42,6 +41,10 @@ typedef struct
     void *userPtr;
 
 } WGFXscreen;
+
+/// Fills a rectangle with the given color.
+/// `color` is a buffer of `bpp` bytes.
+void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned h, const void *color);
 
 #ifdef __cplusplus
 }
