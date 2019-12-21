@@ -36,13 +36,17 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
     else
     {
         // Fill rect left-to-right, top-to-bottom with smaller rects
-        const unsigned fillH = MIN(h, self->scratchSize);
-        const unsigned fillW = MIN(self->scratchSize / fillH, w);
 
-        for(unsigned iy = y; iy < endY; iy += MIN(fillH, endY - iy))
+        unsigned fillH = MIN(h, self->scratchSize); //< min(scratchBuf max height, height left to fill)
+        unsigned fillW;
+        for(unsigned iy = y; iy < endY; iy += fillH)
         {
-            for(unsigned ix = x; ix < endX; ix += MIN(fillW, endX - ix))
+            fillH = MIN(fillH, endY - iy); //< min(scratchBuf max height, height left to fill)
+
+            fillW = MIN(self->scratchSize / fillH, w); //< min(scratchBuf max width, total width to fill)
+            for(unsigned ix = x; ix < endX; ix += fillW)
             {
+                fillW = MIN(fillW, endX - ix); //< min(scratchBuf max width, width left to fill)
                 self->writeRect(ix, iy, fillW, fillH, self->scratchData, self->userPtr);
             }
         }
