@@ -12,6 +12,14 @@ from argparse import ArgumentParser
 from typing import TextIO, Iterable
 
 
+def nextline(stream: TextIO) -> str:
+    """Returns the next non-whitespace line in `stream` (stripped) or an empty line on EOF."""
+    line = stream.readline()
+    while line.isspace() or line.startswith('COMMENT'):
+        line = stream.readline()
+    return line.strip()
+
+
 class BdfRecord:
     def __init__(self, type: str, args: Iterable):
         self.type = type
@@ -19,24 +27,13 @@ class BdfRecord:
         self.lines = []
         self.children = []
 
-    def __repr__(self) -> str:
-        return f'BdfRecord({self.type})'
-
-
-class Bdf:
-    def __init__(self, infile: TextIO):
-        """Parses a BDF font."""
-        self.infile = infile
-        self.font_record = self._parse_record('FONT')
-
-    def _nextline(self):
-        line = self.infile.readline()
-        while line.isspace() or line.startswith('COMMENT'):
-            line = self.infile.readline()
-        return line.strip()
-
-    def _parse_record(self, expected_type: str = None, first_line: str = None) -> BdfRecord:
-        first_line = first_line or self._nextline()
+    @staticmethod
+    def parse_from(stream: TextIO, expected_type: str = None, first_line: str = None) -> "BdfRecord":
+        """Parses a BDF record from the given stream.
+        If `expected_type` is present, throws an exception if the record is not of the given type.
+        If `first_line` is present, uses it instead of fetching a first line from the stream.
+        """
+        first_line = first_line or nextline(stream)
 
         expected_start_tag = 'START' + expected_type if expected_type else ''
         if not first_line.startswith(expected_start_tag):
@@ -46,13 +43,14 @@ class Bdf:
         this_start_tag, *this_args = first_line.split()
         record = BdfRecord(this_start_tag[len('START'):], this_args)
 
-        line = self._nextline()
+        line = nextline(stream)
         while line and not line.startswith('END'):
             if line.startswith('START'):
-                record.children.append(self._parse_record(first_line=line))
+                record.children.append(
+                    BdfRecord.parse_from(stream, first_line=line))
             else:
                 record.lines.append(line)
-            line = self._nextline()
+            line = nextline(stream)
 
         expected_end_tag = this_start_tag.replace('START', 'END')
         if line != expected_end_tag:
@@ -61,9 +59,12 @@ class Bdf:
 
         return record
 
+    def __repr__(self) -> str:
+        return f'BdfRecord({self.type})'
+
 
 if __name__ == '__main__':
     with open('/tmp/test.bdf') as infile:
-        bdf = Bdf(infile)
-        print(bdf.font_record.children[0].lines)
-        print(bdf.font_record.children[1].lines)
+        bdf = BdfRecord.parse_from(infile, 'FONT')
+        print(bdf.children[0].lines)
+        print(bdf.children[1].lines)
