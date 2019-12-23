@@ -8,6 +8,7 @@ Released under the 3-clause BSD license (see LICENSE)
 
 import os
 import sys
+import re
 from argparse import ArgumentParser
 from typing import TextIO, Iterable, Any, Callable
 
@@ -18,14 +19,6 @@ def nextline(stream: TextIO) -> str:
     while line.isspace() or line.startswith('COMMENT'):
         line = stream.readline()
     return line.strip()
-
-
-def try_convert(value: str, conv: Callable[[str], Any]) -> Any:
-    """Returns `conv(value)` if it doesn't throw an exception, or `value` if it does."""
-    try:
-        return conv(value)
-    except:
-        return value
 
 
 class BdfBitmap:
@@ -66,22 +59,48 @@ class BdfBitmap:
 
 
 class BdfProperty:
-    def __init__(self, key: str, value: Iterable):
+    VALUE_RE = re.compile(
+        r'\s*(?:(?P<int>-?\d+)|(?P<quoted>"[^"]*")|(?P<unquoted>.+))')
+
+    def __init__(self, key: str, values_str: str):
+        """Inits a property from its key (name) and a string representing its value(s).
+        Value(s) are parsed as either ints or strings."""
+
         self.key = str(key)
-        self.value = tuple(value)
+        """Name/type of the property."""
+        self.value = self._parse_value(values_str)
+        """Either a tuple of strings/integers or a single string/integer."""
+
+    def _parse_value(self, value_str: str) -> Any:
+        values = []
+        for match in self.VALUE_RE.finditer(value_str):
+            if not match:
+                raise SyntaxError(
+                    f'Expected int or string value, got {repr(value_str)}')
+
+            integer, quoted, unquoted = match.groups()
+            if integer is not None:
+                value = int(integer)
+            elif quoted is not None:
+                value = quoted[1:-1]
+            else:
+                value = unquoted
+            values.append(value)
+
+        return tuple(values) if len(values) != 1 else values[0]
 
     def __repr__(self) -> str:
-        return f'{self.key}={self.value}'
+        return f'{repr(self.value)}'
 
 
 class BdfRecord:
     def __init__(self, type: str, args: Iterable):
         self.type = str(type)
-        """The type of record (FONT, CHAR...)"""
+        """The type of record(FONT, CHAR...)"""
         self.args = list(args)
-        """The arguments present after the START<type> directive"""
+        """The arguments present after the START < type > directive"""
         self.items = {}
-        """A mapping of `field -> <BdfProperty(field, args...) or BdfBitmap where field='BITMAP'>."""
+        """A mapping of `field -> <BdfProperty(field, args...) or BdfBitmap where field = 'BITMAP' > ."""
         self.children = []
         """A list of `BdfRecord`s that are nested into this one."""
 
@@ -115,8 +134,8 @@ class BdfRecord:
             else:
                 if line.startswith('BITMAP'):
                     try:
-                        bmp_width, bmp_height, * \
-                            bmp_off = record.items['BBX'].value
+                        bmp_width, bmp_height, \
+                            *bmp_off = record.items['BBX'].value
                     except KeyError:
                         raise SyntaxError(
                             'Expected character BBX before BITMAP')
@@ -128,11 +147,9 @@ class BdfRecord:
                     # - The file is malformed
                     # - `BdfBitmap.parse_from()` did not read all lines in the bitmap
                     # Should likely throw an exception in both cases
-
                     # <KEY> <VALUE1> <VALUE2>...
-                    key, *value = line.split()
-                    value = tuple(try_convert(item, int) for item in value)
-                    add_record_item(key, BdfProperty(key, value))
+                    key, values_str = line.split(maxsplit=1)
+                    add_record_item(key, BdfProperty(key, values_str))
 
             line = nextline(stream)
 
