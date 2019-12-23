@@ -58,22 +58,21 @@ class BdfBitmap:
         return f'BdfBitmap({self.width}x{self.height})'
 
 
-class BdfProperty:
+class BdfProperty(tuple):
+    """The value of a BDF property as a tuple of ints/strings."""
+
     VALUE_RE = re.compile(
         r'\s*(?:(?P<int>-?\d+)|(?P<quoted>"[^"]*")|(?P<unquoted>.+))')
 
-    def __init__(self, key: str, values_str: str):
-        """Inits a property from its key (name) and a string representing its value(s).
+    def __new__(cls, values_str: str):
+        """Inits a BDF property value given the string representing it in the BDF file.
         Value(s) are parsed as either ints or strings."""
+        return tuple.__new__(cls, cls._parse_value(values_str))
 
-        self.key = str(key)
-        """Name/type of the property."""
-        self.value = self._parse_value(values_str)
-        """Either a tuple of strings/integers or a single string/integer."""
-
-    def _parse_value(self, value_str: str) -> Any:
+    @classmethod
+    def _parse_value(cls, value_str: str) -> Any:
         values = []
-        for match in self.VALUE_RE.finditer(value_str):
+        for match in cls.VALUE_RE.finditer(value_str):
             if not match:
                 raise SyntaxError(
                     f'Expected int or string value, got {repr(value_str)}')
@@ -87,10 +86,7 @@ class BdfProperty:
                 value = unquoted
             values.append(value)
 
-        return tuple(values) if len(values) != 1 else values[0]
-
-    def __repr__(self) -> str:
-        return f'{repr(self.value)}'
+        return tuple(values)
 
 
 class BdfRecord:
@@ -134,8 +130,7 @@ class BdfRecord:
             else:
                 if line.startswith('BITMAP'):
                     try:
-                        bmp_width, bmp_height, \
-                            *bmp_off = record.items['BBX'].value
+                        bmp_width, bmp_height, *bmp_off = record.items['BBX']
                     except KeyError:
                         raise SyntaxError(
                             'Expected character BBX before BITMAP')
@@ -149,7 +144,7 @@ class BdfRecord:
                     # Should likely throw an exception in both cases
                     # <KEY> <VALUE1> <VALUE2>...
                     key, values_str = line.split(maxsplit=1)
-                    add_record_item(key, BdfProperty(key, values_str))
+                    add_record_item(key, BdfProperty(values_str))
 
             line = nextline(stream)
 
