@@ -25,4 +25,31 @@
 #    endif
 #endif
 
+// `WGFX_RODATA`: Puts a `static const` variable in readonly memory.
+// `WGFX_RODATA_READU8(addr)`: Reads a byte from an address (pointer) into a `WGFX_RODATA` variable.
+// - On AVR: puts data is PROGMEM and accessed through <avr/pgmspace.h>
+// - Other platforms with a GCC-like compiler: data is put in the `.rodata` section
+// - Anything else: no-op
+// #define WGFX_RODATA and WGFX_RODATA_READU8(addr) for custom behaviour.
+#ifndef WGFX_RODATA
+#    ifdef __AVR__
+#        include <avr/pgmspace.h>
+#        define WGFX_RODATA PROGMEM
+#    else
+#        if defined(__GNUC__) || defined(__clang__)
+#            define WGFX_RODATA __attribute__((aligned(4), section(".rodata")))
+#        else
+#            define WGFX_RODATA
+#        endif
+#    endif
+#endif
+#ifndef WGFX_RODATA_READU8
+#    ifdef __AVR__
+#        include <avr/pgmspace.h>
+#        define WGFX_RODATA_READU8(addr) pgm_read_byte((addr))
+#    else
+#        define WGFX_RODATA_READU8(addr) (*(addr))
+#    endif
+#endif
+
 #endif // WEEGFX_BASE_H
