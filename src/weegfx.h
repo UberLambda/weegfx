@@ -63,12 +63,13 @@ typedef enum
 void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned h, const WGFXcolor color);
 
 /// Draws a string in monospace font. Overwrites the background!
+/// If `length` is 0, `strlen(string)` is used.
 /// `fgColor` and `bgColor` represent the text color and background color respectively.
 /// `*x` and `*y` is the position of the top-left corner of the first letter of the text;
 /// they are set to the position of the top-right corner of the last letter when the function returns.
 ///
 /// Returns false on failure - usually because `scratchSize` is not enough to hold at least one character of the text...
-int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned *x, unsigned *y,
+int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsigned *x, unsigned *y,
                      const WGFXmonoFont *font, const WGFXcolor fgColor, const WGFXcolor bgColor, WGFXwrapMode wrapMode);
 
 #ifdef __cplusplus

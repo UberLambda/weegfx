@@ -53,7 +53,7 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
     }
 }
 
-int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned *x, unsigned *y,
+int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsigned *x, unsigned *y,
                      const WGFXmonoFont *font, const WGFXcolor fgColor, const WGFXcolor bgColor, WGFXwrapMode wrapMode)
 {
     // FIXME IMPLEMENT
