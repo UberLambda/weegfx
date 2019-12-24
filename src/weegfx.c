@@ -7,7 +7,7 @@
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned h, const void *color)
+void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned h, const WGFXcolor color)
 {
     const unsigned endX = x + w, endY = y + h;
 
@@ -51,4 +51,11 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
             }
         }
     }
+}
+
+int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned *x, unsigned *y,
+                     const WGFXmonoFont *font, const WGFXcolor fgColor, const WGFXcolor bgColor, WGFXwrapMode wrapMode)
+{
+    // FIXME IMPLEMENT
+    return 0;
 }
