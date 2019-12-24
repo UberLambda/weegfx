@@ -23,6 +23,8 @@ typedef struct
     /// 3) Row pixels (one pixel per bit)
     /// Widths are rounded up to the nearest multiple of 8 bits
     /// (e.g.: for a font of width 13, 16 bits are used for each row).
+    /// `data` is assumed to point to a `WGFX_RODATA` variable; data from it is read
+    /// by `WGFX_RODATA_READU8(data + offset)`.
     const WGFX_U8 *data;
 
 } WGFXmonoFont;
