@@ -54,7 +54,7 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
 }
 
 /// <string.h>-less strlen
-inline static unsigned *strlen(const char *string)
+inline static unsigned stringLength(const char *string)
 {
     const char *iCh = string;
     while(*iCh)
@@ -137,7 +137,7 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
 
     unsigned lineWidth = 0, lineHeight = font->height; // Width/height of scratch buffer rect for this line
 
-    length = length == 0 ? strlen(string) : length;
+    length = length == 0 ? stringLength(string) : length;
     const char *const strEnd = string + length;
     const char *iCh = string;
     while(iCh < strEnd)
