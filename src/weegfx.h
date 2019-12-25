@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 
+#include "weegfx/base.h" // For WGFX_RODATA
 #include "weegfx/font.h"
 #include "weegfx/types.h"
 
