@@ -251,6 +251,7 @@ static const WGFXmonoFont {h_varname} WGFX_RODATA = {{
     {font_w}, {font_h},
     {hexbyte(first_ch)}, {hexbyte(last_ch)},
     &{h_varname}_DATA,
+    {bdf_width(font_w) * font_h}, // = {bdf_width(font_w)} * {font_h}
 }};
 
 #endif // {h_guard}"""

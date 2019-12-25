@@ -27,6 +27,10 @@ typedef struct
     /// by `WGFX_RODATA_READU8(data + offset)`.
     const WGFX_U8 *data;
 
+    /// Number of bytes between two subsequent characters' pixel data in `data`.
+    /// Should be (`width` rounded to nearest multiple of 8) * `height`.
+    WGFX_SIZET charDataStride;
+
 } WGFXmonoFont;
 
 #endif // WEEGFX_FONT_H
