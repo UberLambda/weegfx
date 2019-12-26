@@ -249,3 +249,57 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
 
     return 1;
 }
+
+void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsigned imgH,
+                    unsigned x, unsigned y, unsigned w, unsigned h)
+{
+    w = MIN(imgW, w);
+    h = MIN(imgH, h);
+    const unsigned endX = x + w, endY = y + h;
+
+#ifndef WGFX_NO_CLIPPING
+    if(x >= self->width)
+    {
+        return;
+    }
+    else if(endX >= self->width)
+    {
+        w = self->width - x;
+    }
+
+    if(y >= self->height)
+    {
+        return;
+    }
+    else if(endY >= self->height)
+    {
+        h = self->height - y;
+    }
+#endif
+
+    if(w == imgW && h == imgH)
+    {
+        self->writeRect(x, y, w, h, image, self->userPtr);
+    }
+    else
+    {
+        // Need to draw the image in chunks...
+        WGFX_U8 *scratchBuf = self->scratchData;
+        const unsigned nScratchRows = self->scratchSize / w;
+        const unsigned bytesPerRow = w * self->bpp, imageRowStride = imgW * self->bpp;
+
+        for(unsigned row = 0; row < h; row += nScratchRows)
+        {
+            const unsigned nBufRows = MIN(nScratchRows, h - row);
+            for(unsigned iBufRow = 0; iBufRow < nBufRows; iBufRow++)
+            {
+                WGFX_MEMCPY(scratchBuf, image, bytesPerRow);
+                image += imageRowStride;
+                scratchBuf += bytesPerRow;
+            }
+
+            self->writeRect(x, y, w, nBufRows, self->scratchData, self->userPtr);
+            y += nBufRows;
+        }
+    }
+}

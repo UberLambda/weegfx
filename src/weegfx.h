@@ -73,6 +73,12 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
 int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsigned *x, unsigned *y,
                      const WGFXmonoFont *font, const WGFXcolor fgColor, const WGFXcolor bgColor, WGFXwrapMode wrapMode);
 
+/// Draws (at most) `w * h` pixels of `image` (that is a `imgW * imgH` bitmap) to the screen, at position `x`,`y`.
+///
+/// Data in `image` is contiguous top-to-bottom, left-to-right, `bpp` bytes per pixel.
+void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsigned imgH,
+                    unsigned x, unsigned y, unsigned w, unsigned h);
+
 #ifdef __cplusplus
 }
 #endif
