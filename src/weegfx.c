@@ -293,7 +293,7 @@ void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsig
             const unsigned nBufRows = MIN(nScratchRows, h - row);
             for(unsigned iBufRow = 0; iBufRow < nBufRows; iBufRow++)
             {
-                WGFX_MEMCPY(scratchBuf, image, bytesPerRow);
+                WGFX_RODATA_MEMCPY(scratchBuf, image, bytesPerRow);
                 image += imageRowStride;
                 scratchBuf += bytesPerRow;
             }

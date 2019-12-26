@@ -76,6 +76,7 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
 /// Draws (at most) `w * h` pixels of `image` (that is a `imgW * imgH` bitmap) to the screen, at position `x`,`y`.
 ///
 /// Data in `image` is contiguous top-to-bottom, left-to-right, `bpp` bytes per pixel.
+/// Image data is assumed to be `WGFX_RODATA`!
 void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsigned imgH,
                     unsigned x, unsigned y, unsigned w, unsigned h);
 
