@@ -25,7 +25,7 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
     for(size_t i = 0, ib = 0; i < fillSize; i++, ib += self->bpp)
     {
         // TODO PERFORMANCE: Replace this memcpy with a for loop? (`bpp` will always be small)
-        memcpy(&self->scratchData[ib], color, self->bpp);
+        WGFX_MEMCPY(&self->scratchData[ib], color, self->bpp);
     }
 
     if(rectFitsScratch)
@@ -66,7 +66,7 @@ inline static unsigned stringLength(const char *string)
 
 /// Returns the pointer into `buffer` at the character's bottom-right corner.
 /// Does NOT even try to perform any clipping or bounds checking!
-/*FIXME!*/ inline static WGFX_U8 *writeMonoChar(
+WGFX_FORCEINLINE static WGFX_U8 *writeMonoChar(
     char ch,
     WGFX_U8 *buffer, unsigned bpp, unsigned rowStride,
     const WGFXmonoFont *font, unsigned width, unsigned height,
@@ -89,7 +89,7 @@ inline static unsigned stringLength(const char *string)
                 dataByte <<= 1;
                 // TODO PERFORMANCE: Replace memcpy with a simple for loop?
                 // TODO PERFORMANCE: Replace the ternary operator with something else?
-                memcpy(buffer, pixelOn ? fgColor : bgColor, bpp);
+                WGFX_MEMCPY(buffer, pixelOn ? fgColor : bgColor, bpp);
                 buffer += bpp;
 
                 // (the sequence below should be slightly faster than using `dataByteBit % 8`)
@@ -116,7 +116,7 @@ inline static unsigned stringLength(const char *string)
             for(unsigned col = 0; col < width; col++)
             {
                 // TODO PERFORMANCE: Replace memcpy with a simple for loop?
-                memcpy(buffer, bgColor, bpp);
+                WGFX_MEMCPY(buffer, bgColor, bpp);
                 buffer += bpp;
             }
             buffer += rowStride;
