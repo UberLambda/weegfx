@@ -212,7 +212,6 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
             // - End of string reached
             self->writeRect(*x, *y, charBufferWidth, lineHeight, self->scratchData, self->userPtr);
             *x += charBufferWidth;
-            // FIXME - *y -= 1; here fixes the bug but gives the wrong y values
 
             if(charX >= self->width)
             {
