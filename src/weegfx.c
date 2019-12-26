@@ -66,7 +66,7 @@ inline static unsigned stringLength(const char *string)
 
 /// Returns the pointer into `buffer` at the character's bottom-right corner.
 /// Does NOT even try to perform any clipping or bounds checking!
-WGFX_FORCEINLINE static WGFX_U8 *writeMonoChar(
+/*FIXME!*/ inline static WGFX_U8 *writeMonoChar(
     char ch,
     WGFX_U8 *buffer, unsigned bpp, unsigned rowStride,
     const WGFXmonoFont *font, unsigned width, unsigned height,
@@ -85,7 +85,8 @@ WGFX_FORCEINLINE static WGFX_U8 *writeMonoChar(
 
             for(unsigned colBit = 0; colBit < width; colBit++)
             {
-                const int pixelOn = dataByte & (1 << (7 - dataByteBit));
+                const int pixelOn = dataByte & 0x80;
+                dataByte <<= 1;
                 // TODO PERFORMANCE: Replace memcpy with a simple for loop?
                 // TODO PERFORMANCE: Replace the ternary operator with something else?
                 memcpy(buffer, pixelOn ? fgColor : bgColor, bpp);
@@ -131,8 +132,6 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
     const unsigned startX = *x, startY = *y;
 
     const unsigned pixelsPerChar = font->width * font->height;
-    const unsigned bytesPerChar = pixelsPerChar * self->bpp; // (bytes per character in the scratch buffer)
-
     const unsigned maxScratchChars = self->scratchSize / pixelsPerChar;
     if(maxScratchChars == 0)
     {
@@ -157,9 +156,9 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
         const char *const lineEnd = iCh;
         const WGFX_SIZET charsThisLine = lineEnd - lineStart;
 
+#ifndef WGFX_NO_CLIPPING
         const unsigned nextLineY = *y + font->height;
 
-#ifndef WGFX_NO_CLIPPING
         if(*y >= self->height)
         {
             // Line outside screen - exit
@@ -172,20 +171,20 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
         }
 #endif
 
-        WGFX_U8 *charBuffer = self->scratchData;
-
-        unsigned charX = *x;
+        unsigned charX = *x;    // Because `*x` is only updated once per `writeRect()`
         unsigned charRowStride; // bytes between consequent rows of a character bitmap in the scratch buffer
 
         iCh = lineStart;
         for(unsigned i = 0; i < charsThisLine; i += maxScratchChars)
         {
+            unsigned charWidth = font->width;
+            WGFX_U8 *charBuffer = self->scratchData;
+            unsigned charBufferWidth = 0;
             charRowStride = (maxScratchWidth - font->width) * self->bpp;
-            unsigned charWidth = font->width, bufferWidth = 0;
 
             for(unsigned j = 0; j < maxScratchChars; j++)
             {
-                const unsigned nextCharX = *x + font->width;
+                const unsigned nextCharX = charX + font->width;
 
 #ifndef WGFX_NO_CLIPPING
                 if(nextCharX >= self->width)
@@ -203,7 +202,7 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
                 writeMonoChar(*iCh, charBuffer, self->bpp, charRowStride, font, charWidth, lineHeight, fgColor, bgColor);
                 charBuffer += charWidth * self->bpp; // Go right to the top-left corner of next char
                 iCh++;
-                bufferWidth += charWidth;
+                charBufferWidth += charWidth;
                 charX += charWidth;
             }
 
@@ -211,8 +210,9 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
             // - Scratch buffer full
             // - '\n' reached
             // - End of string reached
-            self->writeRect(*x, *y, bufferWidth, lineHeight, self->scratchData, self->userPtr);
-            *x += bufferWidth;
+            self->writeRect(*x, *y, charBufferWidth, lineHeight, self->scratchData, self->userPtr);
+            *x += charBufferWidth;
+            // FIXME - *y -= 1; here fixes the bug but gives the wrong y values
 
             if(charX >= self->width)
             {
