@@ -31,6 +31,7 @@
 // - Other platforms with a GCC-like compiler: data is put in the `.rodata` section
 // - Anything else: no-op
 // #define WGFX_RODATA and WGFX_RODATA_READU8(addr) for custom behaviour.
+// `WGFX_RODATA_MEMCPY(dest, src, size)`: Like `memcpy()`, but `src` is assumed to be in RODATA.
 #ifndef WGFX_RODATA
 #    ifdef __AVR__
 #        include <avr/pgmspace.h>
@@ -49,6 +50,14 @@
 #        define WGFX_RODATA_READU8(addr) pgm_read_byte((addr))
 #    else
 #        define WGFX_RODATA_READU8(addr) (*(addr))
+#    endif
+#endif
+#ifndef WGFX_RODATA_MEMCPY
+#    ifdef __AVR__
+#        include <avr/pgmspace.h>
+#        define WGFX_RODATA_MEMCPY memcpy_P
+#    else
+#        define WGFX_RODATA_MEMCPY WGFX_MEMCPY
 #    endif
 #endif
 
