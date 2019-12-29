@@ -12,11 +12,17 @@ extern "C" {
 #include "weegfx/font.h"
 #include "weegfx/types.h"
 
-/// A function that reads a rectangle of pixels from the screen to `buf`.
-typedef void (*WGFXreadRectPFN)(unsigned x, unsigned y, unsigned w, unsigned h, WGFX_U8 *buf, void *userPtr);
+/// A function that sets the address window of the screen and commences a write to it.
+/// See `WGFXscreen::beginWrite`.
+typedef void (*WGFXbeginWritePFN)(unsigned x, unsigned y, unsigned w, unsigned h, void *userPtr);
 
-/// A function that copies a rectangle of pixels from `buf` to the screen.
-typedef void (*WGFXwriteRectPFN)(unsigned x, unsigned y, unsigned w, unsigned h, const WGFX_U8 *buf, void *userPtr);
+/// A function that writes `size` bytes of pixel data to the screen.
+/// See `WGFXscreen::write`.
+typedef void (*WGFXwritePFN)(const WGFX_U8 *buf, WGFX_SIZET size, void *userPtr);
+
+/// A function that ends a screen write.
+/// See `WGFXscreen::endWrite`.
+typedef void (*WGFXendWritePFN)(void *userPtr);
 
 /// An instance of weegfx.
 typedef struct
@@ -37,13 +43,26 @@ typedef struct
     /// The scratch buffer; must be at least `fbSize` bytes in size.
     WGFX_U8 *scratchData;
 
-    /// Used to read pixel data from the actual screen.
-    WGFXreadRectPFN readRect;
+    /// Used by the library to begin writing to the screen.
+    /// It gets passed the X, Y (top-left) and width, height of the rectangle of
+    /// the screen that the library wants to write to, and it should tell the screen
+    /// to start writing at that location.
+    WGFXbeginWritePFN beginWrite;
 
-    /// Used to write pixel data to the actual screen.
-    WGFXwriteRectPFN writeRect;
+    /// Used by the library to write pixel data to the screen.
+    /// After a `beginWrite()`, `write()` is called enough times to cover the whole
+    /// pixel area (address window) specified in `beginWrite()`.
+    ///
+    /// The passed buffer data is guaranteed to contain a multiple of `bpp` bytes,
+    /// with no partial pixel passed (i.e. the first byte of the buffer is the
+    /// first byte of a pixel and the last byte of the buffer is the last byte of a pixel).
+    WGFXwritePFN write;
 
-    /// User data pointer passed to `readRect` and `writeRect`.
+    /// Used by the library to end a write to the screen.
+    /// This is called after `beginWrite()` and `write()`[s] have happened.
+    WGFXendWritePFN endWrite;
+
+    /// User data pointer passed to `beginWrite`, `write` and `endWrite`.
     void *userPtr;
 
 } WGFXscreen;
@@ -58,6 +77,12 @@ typedef enum
     WGFX_WRAP_RIGHT = 0x2,   ///< Wrap on right screen edge? (clip otherwise)
     WGFX_WRAP_ALL = WGFX_WRAP_NEWLINE | WGFX_WRAP_RIGHT,
 } WGFXwrapMode;
+
+/// A bitmask of bitmap drawing flags.
+typedef enum
+{
+    WGFX_BITMAP_RODATA = 0x1, ///< The bitmap data is in `WGFX_RODATA` and requires special care when reading.
+} WGFXbitmapFlags;
 
 /// Fills a rectangle with the given color.
 /// `color` is a buffer of `bpp` bytes.
@@ -76,9 +101,11 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
 /// Draws (at most) `w * h` pixels of `image` (that is a `imgW * imgH` bitmap) to the screen, at position `x`,`y`.
 ///
 /// Data in `image` is contiguous top-to-bottom, left-to-right, `bpp` bytes per pixel.
-/// Image data is assumed to be `WGFX_RODATA`!
+/// If `flags & WGFX_BITMAP_RODATA` the image is assumed to be `WGFX_RODATA`, so its pixel data is loaded to memory
+/// (in chunks) before drawing it.
 void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsigned imgH,
-                    unsigned x, unsigned y, unsigned w, unsigned h);
+                    unsigned x, unsigned y, unsigned w, unsigned h,
+                    WGFXbitmapFlags flags);
 
 #ifdef __cplusplus
 }
