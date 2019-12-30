@@ -18,39 +18,35 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
     if(endY >= self->height) h = self->height - y;
 #endif
 
-    const WGFX_SIZET xferSize = w * h;
-    const int rectFitsScratch = self->scratchSize >= xferSize;
+    const WGFX_SIZET xferCount = w * h;
+    const WGFX_SIZET scratchSizeB = self->scratchSize * self->bpp;
+    const int rectFitsScratch = self->scratchSize >= xferCount;
 
-    const WGFX_SIZET fillSize = rectFitsScratch ? xferSize : self->scratchSize;
-    for(size_t i = 0, ib = 0; i < fillSize; i++, ib += self->bpp)
+    const WGFX_SIZET fillCount = rectFitsScratch ? fillCount : self->scratchSize;
+    for(size_t i = 0, ib = 0; i < fillCount; i++, ib += self->bpp)
     {
         // TODO PERFORMANCE: Replace this memcpy with a for loop? (`bpp` will always be small)
         WGFX_MEMCPY(&self->scratchData[ib], color, self->bpp);
     }
 
+    self->beginWrite(x, y, w, h, self->userPtr);
     if(rectFitsScratch)
     {
         // Fill whole rect at once
-        self->writeRect(x, y, w, h, self->scratchData, self->userPtr);
+        self->write(self->scratchData, scratchSizeB, self->userPtr);
     }
     else
     {
-        // Fill rect left-to-right, top-to-bottom with smaller rects
-
-        unsigned fillH = MIN(h, self->scratchSize); //< min(scratchBuf max height, height left to fill)
-        unsigned fillW;
-        for(unsigned iy = y; iy < endY; iy += fillH)
+        // Fill rect in chunks
+        const WGFX_SIZET xferSizeB = xferCount * self->bpp;
+        WGFX_SIZET chunkSizeB = scratchSizeB;
+        for(WGFX_SIZET sentB = 0; sentB < xferSizeB; sentB += chunkSizeB)
         {
-            fillH = MIN(fillH, endY - iy); //< min(scratchBuf max height, height left to fill)
-
-            fillW = MIN(self->scratchSize / fillH, w); //< min(scratchBuf max width, total width to fill)
-            for(unsigned ix = x; ix < endX; ix += fillW)
-            {
-                fillW = MIN(fillW, endX - ix); //< min(scratchBuf max width, width left to fill)
-                self->writeRect(ix, iy, fillW, fillH, self->scratchData, self->userPtr);
-            }
+            self->write(self->scratchData, chunkSizeB, self->userPtr);
+            chunkSizeB = MIN(chunkSizeB, xferSizeB - sentB);
         }
     }
+    self->endWrite(self->userPtr);
 }
 
 /// <string.h>-less strlen
@@ -210,7 +206,9 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
             // - Scratch buffer full
             // - '\n' reached
             // - End of string reached
-            self->writeRect(*x, *y, charBufferWidth, lineHeight, self->scratchData, self->userPtr);
+            self->beginWrite(*x, *y, charBufferWidth, lineHeight, self->userPtr);
+            self->write(self->scratchData, charBufferWidth * lineHeight * self->bpp, self->userPtr);
+            self->endWrite(self->userPtr);
             *x += charBufferWidth;
 
             if(charX >= self->width)
@@ -251,7 +249,7 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
 }
 
 void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsigned imgH,
-                    unsigned x, unsigned y, unsigned w, unsigned h)
+                    unsigned x, unsigned y, unsigned w, unsigned h, WGFXbitmapFlags flags)
 {
     w = MIN(imgW, w);
     h = MIN(imgH, h);
@@ -277,29 +275,42 @@ void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsig
     }
 #endif
 
-    if(w == imgW && h == imgH)
+    const int rodata = flags & WGFX_BITMAP_RODATA;
+    const WGFX_SIZET scratchSizeB = self->scratchSize * self->bpp;
+    const WGFX_SIZET rectSize = w * h, rectSizeB = rectSize * self->bpp;
+
+    self->beginWrite(x, y, w, h, self->userPtr);
+
+    if(!rodata && w == imgW && h == imgH)
     {
-        self->writeRect(x, y, w, h, image, self->userPtr);
+        // Can write the whole image at once directly
+        self->write(image, rectSize, self->userPtr);
     }
     else
     {
-        // Need to draw the image in chunks...
-        WGFX_U8 *scratchBuf = self->scratchData;
-        const unsigned nScratchRows = self->scratchSize / w;
-        const unsigned bytesPerRow = w * self->bpp, imageRowStride = imgW * self->bpp;
-
-        for(unsigned row = 0; row < h; row += nScratchRows)
+        // Need to draw the image row-by-row...
+        const WGFX_SIZET imageRowStride = imgW * self->bpp;
+        WGFX_SIZET bytesPerChunk = MIN(scratchSizeB, w * self->bpp);
+        if(rodata)
         {
-            const unsigned nBufRows = MIN(nScratchRows, h - row);
-            for(unsigned iBufRow = 0; iBufRow < nBufRows; iBufRow++)
+            for(WGFX_SIZET iByte = 0; iByte < rectSizeB; iByte += bytesPerChunk)
             {
-                WGFX_RODATA_MEMCPY(scratchBuf, image, bytesPerRow);
+                bytesPerChunk = MIN(bytesPerChunk, rectSizeB - iByte);
+                WGFX_RODATA_MEMCPY(self->scratchData, image, bytesPerChunk);
+                self->write(self->scratchData, bytesPerChunk, self->userPtr);
                 image += imageRowStride;
-                scratchBuf += bytesPerRow;
             }
-
-            self->writeRect(x, y, w, nBufRows, self->scratchData, self->userPtr);
-            y += nBufRows;
+        }
+        else
+        {
+            for(WGFX_SIZET iByte = 0; iByte < rectSizeB; iByte += bytesPerChunk)
+            {
+                bytesPerChunk = MIN(bytesPerChunk, rectSizeB - iByte);
+                self->write(image, bytesPerChunk, self->userPtr);
+                image += imageRowStride;
+            }
         }
     }
+
+    self->endWrite(self->userPtr);
 }
