@@ -19,13 +19,13 @@ int wgfxSTM32Init(WGFXstm32Backend *self, unsigned priority)
     // 8/16-bit memory size, 8/16-bit peripheral size, increment memory pointer but not peripheral, memory -> peripheral
     const unsigned dmaSize = (self->bpp % 2) == 0 ? 0x1 : 0x0; // Either 8 or 16 bits
     self->dmaChannel->CCR = 0x00000000;
-    self->dmaChannel->CCR |= (priority << DMA_CCR_PL_Pos) | (dmaSize << DMA_CCR_MSIZE_Pos) | (dmaSize << DMA_CCR_PSIZE_Pos) | DMA_CCR_PINC | DMA_CCR_DIR;
+    self->dmaChannel->CCR |= (priority << DMA_CCR_PL_Pos) | (dmaSize << DMA_CCR_MSIZE_Pos) | (dmaSize << DMA_CCR_PSIZE_Pos) | DMA_CCR_MINC | DMA_CCR_DIR;
 
     // Destination = the SPI data register
     self->dmaChannel->CPAR = (WGFX_U32)&self->spi->DR;
 
     // Clear pending transfer complete/error bits
-    self->dma->ISR |= self->dmaISRDoneMask;
+    self->dma->IFCR |= self->dmaISRDoneMask;
 
     return 1;
 }
@@ -34,7 +34,7 @@ int wgfxSTM32Init(WGFXstm32Backend *self, unsigned priority)
 WGFX_FORCEINLINE void dmaSpiTx(WGFXstm32Backend *self, const void *buf, WGFX_SIZET size)
 {
     while(self->dma->ISR & self->dmaISRDoneMask) {}
-    self->dma->ISR |= self->dmaISRDoneMask;
+    self->dma->IFCR |= self->dmaISRDoneMask;
 
     self->dmaChannel->CNDTR = size;
     self->dmaChannel->CMAR = (WGFX_U32)buf;
