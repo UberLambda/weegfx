@@ -10,14 +10,17 @@
 
 int wgfxSTM32Init(WGFXstm32Backend *self, unsigned priority)
 {
-    if(!(self->spi && self->dma && self->dmaChannel && self->beginScreenWrite && self->endScreenWrite))
+    if(!(self && self->spi && self->dma && self->dmaChannel && self->beginScreenWrite && self->endScreenWrite))
     {
         return 0;
     }
-    if(priority > 0x3) priority = 0x3;
+    if(priority > 0x3)
+    {
+        priority = 0x3;
+    }
 
     // 8/16-bit memory size, 8/16-bit peripheral size, increment memory pointer but not peripheral, memory -> peripheral
-    const unsigned dmaSize = (self->bpp % 2) == 0 ? 0x1 : 0x0; // Either 8 or 16 bits
+    const unsigned dmaSize = (self->spi->CR1 & SPI_CR1_DFF) ? 0x1 : 0x0; // Either 16 or 8 bits
     self->dmaChannel->CCR = 0x00000000;
     self->dmaChannel->CCR |= (priority << DMA_CCR_PL_Pos) | (dmaSize << DMA_CCR_MSIZE_Pos) | (dmaSize << DMA_CCR_PSIZE_Pos) | DMA_CCR_MINC | DMA_CCR_DIR;
 
@@ -30,12 +33,16 @@ int wgfxSTM32Init(WGFXstm32Backend *self, unsigned priority)
     return 1;
 }
 
-/// Transfer a buffer to SPI via DMA.
-WGFX_FORCEINLINE void dmaSpiTx(WGFXstm32Backend *self, const void *buf, WGFX_SIZET size)
+/// Spinlock waiting for a DMA transfer to complete / error out, then clear the flags.
+WGFX_FORCEINLINE void dmaWait(WGFXstm32Backend *self)
 {
     while(!(self->dma->ISR & self->dmaISRDoneMask)) {}
     self->dma->IFCR |= self->dmaISRDoneMask;
+}
 
+/// Transfer a buffer to SPI via DMA.
+WGFX_FORCEINLINE void dmaSpiTx(WGFXstm32Backend *self, const void *buf, WGFX_SIZET size)
+{
     self->dmaChannel->CNDTR = size;
     self->dmaChannel->CMAR = (WGFX_U32)buf;
     self->dmaChannel->CCR |= DMA_CCR_EN;
@@ -49,10 +56,12 @@ void wgfxSTM32Write(const WGFX_U8 *buf, WGFX_SIZET size, void *userPtr)
     for(i = DMA_MAX_TRANSFER_SIZE; i < size; i += DMA_MAX_TRANSFER_SIZE)
     {
         dmaSpiTx(self, buf, DMA_MAX_TRANSFER_SIZE);
+        dmaWait(self);
     }
     if((size - (i - DMA_MAX_TRANSFER_SIZE)) > 0)
     {
         dmaSpiTx(self, buf, size - i);
+        dmaWait(self);
     }
 }
 
