@@ -57,20 +57,22 @@ void wgfxSTM32Write(const WGFX_U8 *buf, WGFX_SIZET size, void *userPtr)
 {
     WGFXstm32Backend *self = (WGFXstm32Backend *)userPtr;
 
-    dmaWait(self);
-
     WGFX_SIZET i;
     for(i = DMA_MAX_TRANSFER_SIZE; i < size; i += DMA_MAX_TRANSFER_SIZE)
     {
-        dmaSpiTx(self, buf, DMA_MAX_TRANSFER_SIZE);
         dmaWait(self);
+        dmaSpiTx(self, buf, DMA_MAX_TRANSFER_SIZE);
     }
     i -= DMA_MAX_TRANSFER_SIZE;
     if((size - i) > 0)
     {
-        dmaSpiTx(self, buf, size - i);
         dmaWait(self);
+        dmaSpiTx(self, buf, size - i);
     }
+
+    // NOTE: Does NOT wait for the last DMA transfer to complete!
+    //       This way the CPU can perform more useful operations in the meantime
+    //       (until the next `wgfxSTM32Write()` happens, at which point the first `dmaWait()` spinlocks!)
 }
 
 void wgfxSTM32BeginWrite(unsigned x, unsigned y, unsigned w, unsigned h, void *userPtr)
@@ -87,6 +89,7 @@ void wgfxSTM32EndWrite(void *userPtr)
     WGFXstm32Backend *self = (WGFXstm32Backend *)userPtr;
     if(self->endScreenWrite)
     {
+        dmaWait(self); // Ensure that all writes have reached the screen
         self->endScreenWrite(self->backendUserPtr);
     }
 }
