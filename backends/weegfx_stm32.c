@@ -33,7 +33,7 @@ int wgfxSTM32Init(WGFXstm32Backend *self, unsigned priority)
 /// Transfer a buffer to SPI via DMA.
 WGFX_FORCEINLINE void dmaSpiTx(WGFXstm32Backend *self, const void *buf, WGFX_SIZET size)
 {
-    while(self->dma->ISR & self->dmaISRDoneMask) {}
+    while(!(self->dma->ISR & self->dmaISRDoneMask)) {}
     self->dma->IFCR |= self->dmaISRDoneMask;
 
     self->dmaChannel->CNDTR = size;
