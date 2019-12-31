@@ -33,24 +33,31 @@ int wgfxSTM32Init(WGFXstm32Backend *self, unsigned priority)
     return 1;
 }
 
-/// Spinlock waiting for a DMA transfer to complete / error out, then clear the flags.
-WGFX_FORCEINLINE void dmaWait(WGFXstm32Backend *self)
-{
-    while(!(self->dma->ISR & self->dmaISRDoneMask)) {}
-    self->dma->IFCR |= self->dmaISRDoneMask;
-}
-
-/// Transfer a buffer to SPI via DMA.
+/// Setup the DMA channel to transfer a buffer to SPI and enable it.
 WGFX_FORCEINLINE void dmaSpiTx(WGFXstm32Backend *self, const void *buf, WGFX_SIZET size)
 {
     self->dmaChannel->CNDTR = size;
     self->dmaChannel->CMAR = (WGFX_U32)buf;
+    // Start the DMA channel
     self->dmaChannel->CCR |= DMA_CCR_EN;
+}
+
+/// Spinlock waiting for a DMA transfer to complete / error out, then clear ISR flags and disable the DMA channel.
+WGFX_FORCEINLINE void dmaWait(WGFXstm32Backend *self)
+{
+    // Until the DMA channel is disabled or a transfer complete event / transfer error event happens...
+    while((self->dmaChannel->CCR & DMA_CCR_EN) && !(self->dma->ISR & self->dmaISRDoneMask)) {}
+    // Clear interrupt flags
+    self->dma->IFCR |= self->dmaISRGlobalMask;
+    // Disable the DMA channel
+    self->dmaChannel->CCR &= ~DMA_CCR_EN;
 }
 
 void wgfxSTM32Write(const WGFX_U8 *buf, WGFX_SIZET size, void *userPtr)
 {
     WGFXstm32Backend *self = (WGFXstm32Backend *)userPtr;
+
+    dmaWait(self);
 
     WGFX_SIZET i;
     for(i = DMA_MAX_TRANSFER_SIZE; i < size; i += DMA_MAX_TRANSFER_SIZE)

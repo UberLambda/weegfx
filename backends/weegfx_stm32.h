@@ -52,6 +52,10 @@ typedef struct
     /// ORed with `dma`'s `ISR` to know when a write is complete.
     WGFX_U32 dmaISRDoneMask;
 
+    /// `DMA_ISR_TCIFx_GIF` for x = index of `dmaChannel`;
+    /// ORed with `dma`'s `ICFR` to clear DMA transfer flags.
+    WGFX_U32 dmaISRGlobalMask;
+
     /// Called before pixel data for the given rect is written to the screen via SPI. Can be null.
     ///
     /// Use this to assert the CS pin, set the address window and prepare the screen for receiving data.
