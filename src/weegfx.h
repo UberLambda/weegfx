@@ -68,7 +68,7 @@ typedef struct
 } WGFXscreen;
 
 /// A color in weegfx, i.e. an array of `bpp` bytes used to represent a single pixel.
-typedef void *WGFXcolor;
+typedef const void *WGFXcolor;
 
 /// A bitmask of wrapping modes for text.
 typedef enum
