@@ -65,7 +65,8 @@ void wgfxSTM32Write(const WGFX_U8 *buf, WGFX_SIZET size, void *userPtr)
         dmaSpiTx(self, buf, DMA_MAX_TRANSFER_SIZE);
         dmaWait(self);
     }
-    if((size - (i - DMA_MAX_TRANSFER_SIZE)) > 0)
+    i -= DMA_MAX_TRANSFER_SIZE;
+    if((size - i) > 0)
     {
         dmaSpiTx(self, buf, size - i);
         dmaWait(self);
