@@ -213,21 +213,22 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
             {
                 const unsigned charStride = charWidth * self->bpp; // Offset to go right to the top-left corner of next char
 
-                for(xRight = charWidth - 1; xRight < chunkWidth; xRight += charWidth)
+                for(xRight = 0; xRight < chunkWidth; xRight += charWidth)
                 {
                     writeMonoChar(*iCh, chunkBuffer, self->bpp, chunkRowStride, font, scale, charWidth, lineHeight, fgColor, bgColor);
                     chunkBuffer += charStride;
                     iCh++;
                 }
-                xRight -= (charWidth - 1);
             }
 
-            // Then render whatever is left (i.e. any last character that has to be clipped because it does not fit)
-            const unsigned lastCharWidth = chunkWidth - xRight;
-            if(lastCharWidth > 0)
+            if(xRight > chunkWidth)
             {
+                // Last char end X overshoot end of chunk; render whatever is left...
+                const unsigned lastCharWidth = chunkWidth - (xRight - charWidth);
+
                 if(!(wrapMode & WGFX_WRAP_RIGHT))
                 {
+                    // Clip last character
                     writeMonoChar(*iCh, chunkBuffer, self->bpp, chunkRowStride, font, scale, lastCharWidth, lineHeight, fgColor, bgColor);
                     iCh++;
                 }
