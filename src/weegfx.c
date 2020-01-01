@@ -79,14 +79,18 @@ WGFX_FORCEINLINE static WGFX_U8 *writeMonoChar(
             dataByte = WGFX_RODATA_READU8(data);
             dataByteBit = 0;
 
-            for(unsigned colBit = 0; colBit < width; colBit++)
+            for(unsigned colBit = 0; colBit < font->width; colBit++)
             {
-                const int pixelOn = dataByte & 0x80;
-                dataByte <<= 1;
-                // TODO PERFORMANCE: Replace memcpy with a simple for loop?
-                // TODO PERFORMANCE: Replace the ternary operator with something else?
-                WGFX_MEMCPY(buffer, pixelOn ? fgColor : bgColor, bpp);
-                buffer += bpp;
+                // Draw only up to `width`, but seek in the memory buffer up to `font->width`!
+                if(colBit < width)
+                {
+                    const int pixelOn = dataByte & 0x80;
+                    dataByte <<= 1;
+                    // TODO PERFORMANCE: Replace memcpy with a simple for loop?
+                    // TODO PERFORMANCE: Replace the ternary operator with something else?
+                    WGFX_MEMCPY(buffer, pixelOn ? fgColor : bgColor, bpp);
+                    buffer += bpp;
+                }
 
                 // (the sequence below should be slightly faster than using `dataByteBit % 8`)
                 dataByteBit++;
@@ -167,52 +171,72 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
         }
 #endif
 
-        unsigned charX = *x;    // Because `*x` is only updated once per `writeRect()`
-        unsigned charRowStride; // bytes between consequent rows of a character bitmap in the scratch buffer
-
         iCh = lineStart;
-        for(unsigned i = 0; i < charsThisLine; i += maxScratchChars)
+
+        const unsigned nChunks = (charsThisLine - 1) / maxScratchChars + 1;
+        for(unsigned i = 0; i < nChunks; i++)
         {
-            unsigned charWidth = font->width;
-            WGFX_U8 *charBuffer = self->scratchData;
-            unsigned charBufferWidth = 0;
-            charRowStride = (maxScratchWidth - font->width) * self->bpp;
+            WGFX_U8 *chunkBuffer = self->scratchData;
+            const unsigned nCharsThisChunk = MIN(maxScratchChars, charsThisLine - (iCh - lineStart));
+            const unsigned maxChunkWidth = nCharsThisChunk * font->width;     // Hypothetical maximum width for this chunk
+            const unsigned chunkWidth = MIN(maxChunkWidth, self->width - *x); // Actual width of this chunk
 
-            for(unsigned j = 0; j < maxScratchChars; j++)
+            // Render as many whole characters as possible
+            unsigned xRight = 0;
+            if(chunkWidth >= font->width)
             {
-                const unsigned nextCharX = charX + font->width;
+                const unsigned charRowStride = (chunkWidth - font->width) * self->bpp;
+                const unsigned charStride = font->width * self->bpp; // Offset to go right to the top-left corner of next char
 
-#ifndef WGFX_NO_CLIPPING
-                if(nextCharX >= self->width)
+                for(xRight = font->width - 1; xRight < chunkWidth; xRight += font->width)
                 {
-                    // Current char only partially visible - clip it
-                    charWidth = font->width - (nextCharX - self->width);
-                    charRowStride = (maxScratchWidth - charWidth) * self->bpp;
+                    writeMonoChar(*iCh, chunkBuffer, self->bpp, charRowStride, font, font->width, lineHeight, fgColor, bgColor);
+                    chunkBuffer += charStride;
+                    iCh++;
                 }
-                else if(charX >= self->width)
+                xRight -= (font->width - 1);
+            }
+
+            // Then render whatever is left (i.e. any last character that has to be clipped because it does not fit)
+            const unsigned lastCharWidth = chunkWidth - xRight;
+            if(lastCharWidth > 0)
+            {
+                const unsigned lastCharRowStride = (chunkWidth - lastCharWidth) * self->bpp;
+                if(!(wrapMode & WGFX_WRAP_RIGHT))
                 {
-                    // Current char out of screen bounds (to the right)
-                    break;
+                    writeMonoChar(*iCh, chunkBuffer, self->bpp, lastCharRowStride, font, lastCharWidth, lineHeight, fgColor, bgColor);
+                    iCh++;
                 }
-#endif
-                writeMonoChar(*iCh, charBuffer, self->bpp, charRowStride, font, charWidth, lineHeight, fgColor, bgColor);
-                charBuffer += charWidth * self->bpp; // Go right to the top-left corner of next char
-                iCh++;
-                charBufferWidth += charWidth;
-                charX += charWidth;
+                else
+                {
+                    // Wrap right: instead of drawing a partially clipped char at the end of the line, the character will
+                    // be drawn at the start of the next line.
+                    // Still need to fill the rectangle with `bgColor` to prevent artefacts!
+                    for(unsigned iRow = 0; iRow < lineHeight; iRow++)
+                    {
+                        for(unsigned iCol = 0; iCol < lastCharWidth; iCol++)
+                        {
+                            // TODO: Replace the memcpy with a simple for loop for performance?
+                            WGFX_MEMCPY(chunkBuffer, bgColor, self->bpp);
+                            chunkBuffer += self->bpp;
+                        }
+                        chunkBuffer += lastCharRowStride;
+                    }
+                }
             }
 
             // Draw the whole scratch buffer to the screen when:
             // - Scratch buffer full
             // - '\n' reached
             // - End of string reached
-            self->beginWrite(*x, *y, charBufferWidth, lineHeight, self->userPtr);
-            self->write(self->scratchData, charBufferWidth * lineHeight * self->bpp, self->userPtr);
+            self->beginWrite(*x, *y, chunkWidth, lineHeight, self->userPtr);
+            self->write(self->scratchData, chunkWidth * lineHeight * self->bpp, self->userPtr);
             self->endWrite(self->userPtr);
-            *x += charBufferWidth;
+            *x += chunkWidth;
 
-            if(charX >= self->width)
+            if(chunkWidth < maxChunkWidth)
             {
+                // Chunk got clipped on the right
                 if(wrapMode & WGFX_WRAP_RIGHT)
                 {
                     // Wrap and continue from `iCh`
@@ -221,7 +245,8 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
                 }
                 else
                 {
-                    // Wait for next line
+                    // Discard all characters up to the end of this line
+                    // Will continue from the start of next line...
                     break;
                 }
             }
@@ -242,6 +267,7 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
                 //self->writeRect(*x, *y, font->width, font->height, self->scratchData, self->userPtr);
             }
         }
+
         iCh++; // Skip the '\n' or end char
     }
 
