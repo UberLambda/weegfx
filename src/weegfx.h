@@ -93,10 +93,11 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
 /// `fgColor` and `bgColor` represent the text color and background color respectively.
 /// `*x` and `*y` is the position of the top-left corner of the first letter of the text;
 /// they are set to the position of the top-right corner of the last letter when the function returns.
+/// If `scale` is `> 1`, the font will be upscaled (nearest neighbour) by that factor before drawing.
 ///
 /// Returns false on failure - usually because `scratchSize` is not enough to hold at least one character of the text...
 int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsigned *x, unsigned *y,
-                     const WGFXmonoFont *font, const WGFXcolor fgColor, const WGFXcolor bgColor, WGFXwrapMode wrapMode);
+                     const WGFXmonoFont *font, unsigned scale, const WGFXcolor fgColor, const WGFXcolor bgColor, WGFXwrapMode wrapMode);
 
 /// Draws (at most) `w * h` pixels of `image` (that is a `imgW * imgH` bitmap) to the screen, at position `x`,`y`.
 ///
