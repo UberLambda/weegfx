@@ -199,8 +199,19 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
         iCh = lineStart;
 
         const unsigned nChunks = (charsThisLine - 1) / maxScratchChars + 1;
+        int lastCharClipped = 0; // Was the last character drawn cut off?
         for(unsigned i = 0; i < nChunks; i++)
         {
+#ifndef WGFX_NO_CLIPPING
+            if(*x >= self->width && (wrapMode & WGFX_WRAP_NEWLINE))
+            {
+                // This chunk of this line is offscreen; go to the next newline (if any)
+                lastCharClipped = 0;
+                iCh = lineEnd;
+                break;
+            }
+#endif
+
             WGFX_U8 *chunkBuffer = self->scratchData;
             const unsigned nCharsThisChunk = MIN(maxScratchChars, charsThisLine - (iCh - lineStart));
             const unsigned maxChunkWidth = nCharsThisChunk * charWidth;       // Hypothetical maximum width for this chunk
@@ -208,12 +219,12 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
             const unsigned chunkRowStride = chunkWidth * self->bpp;
 
             // Render as many whole characters as possible
-            unsigned xRight = 0;
+            unsigned xRight = 0; // End X of the current char, relative to scratch buffer X=0
             if(chunkWidth >= charWidth)
             {
                 const unsigned charStride = charWidth * self->bpp; // Offset to go right to the top-left corner of next char
 
-                for(xRight = 0; xRight < chunkWidth; xRight += charWidth)
+                for(; xRight < chunkWidth; xRight += charWidth)
                 {
                     writeMonoChar(*iCh, chunkBuffer, self->bpp, chunkRowStride, font, scale, charWidth, lineHeight, fgColor, bgColor);
                     chunkBuffer += charStride;
@@ -221,9 +232,12 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
                 }
             }
 
-            if(xRight > chunkWidth)
+            lastCharClipped = xRight > chunkWidth || xRight == 0;
+            if(lastCharClipped)
             {
-                // Last char end X overshoot end of chunk; render whatever is left...
+                // Either the last char's end X overshoot the end of the chunk,
+                // or we couldn't fit any character in it
+                // -> need to draw a partially-clipped char or blank its area (depending on wrap mode)
                 const unsigned lastCharWidth = chunkWidth - (xRight - charWidth);
 
                 if(!(wrapMode & WGFX_WRAP_RIGHT))
@@ -260,21 +274,12 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
             self->endWrite(self->userPtr);
             *x += chunkWidth;
 
-            if(chunkWidth < maxChunkWidth)
+            if(lastCharClipped && (wrapMode & WGFX_WRAP_RIGHT))
             {
-                // Chunk got clipped on the right
-                if(wrapMode & WGFX_WRAP_RIGHT)
-                {
-                    // Wrap and continue from `iCh`
-                    *x = startX;
-                    *y += lineHeight;
-                }
-                else
-                {
-                    // Discard all characters up to the end of this line
-                    // Will continue from the start of next line...
-                    break;
-                }
+                // Wrap and continue next line from `iCh`
+                *x = startX;
+                *y += lineHeight;
+                break;
             }
         }
 
@@ -293,8 +298,11 @@ int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsi
                 //self->writeRect(*x, *y, font->width, font->height, self->scratchData, self->userPtr);
             }
         }
-
-        iCh++; // Skip the '\n' or end char
+        if(!lastCharClipped)
+        {
+            iCh++; // Skip the '\n' or end char
+        }
+        // else continue next line from the clipped char
     }
 
     return 1;
