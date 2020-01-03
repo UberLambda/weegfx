@@ -73,6 +73,7 @@ typedef const void *WGFXcolor;
 /// A bitmask of wrapping modes for text.
 typedef enum
 {
+    WGFX_WRAP_NONE = 0x0,    ///< Never wrap (= clip right)
     WGFX_WRAP_NEWLINE = 0x1, ///< Wrap on '\n'? (treat '\n' as any other character otherwise)
     WGFX_WRAP_RIGHT = 0x2,   ///< Wrap on right screen edge? (clip otherwise)
     WGFX_WRAP_ALL = WGFX_WRAP_NEWLINE | WGFX_WRAP_RIGHT,
