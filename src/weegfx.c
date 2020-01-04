@@ -22,7 +22,7 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
     const WGFX_SIZET scratchSizeB = self->scratchSize * self->bpp;
     const int rectFitsScratch = self->scratchSize >= xferCount;
 
-    const WGFX_SIZET fillCount = rectFitsScratch ? fillCount : self->scratchSize;
+    const WGFX_SIZET fillCount = rectFitsScratch ? xferCount : self->scratchSize;
     for(size_t i = 0, ib = 0; i < fillCount; i++, ib += self->bpp)
     {
         // TODO PERFORMANCE: Replace this memcpy with a for loop? (`bpp` will always be small)
