@@ -9,6 +9,8 @@
 
 void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned h, const WGFXcolor color)
 {
+    if(w == 0 || h == 0) return;
+
     const unsigned endX = x + w, endY = y + h;
 
 #ifndef WGFX_NO_CLIPPING
