@@ -35,7 +35,7 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
     if(rectFitsScratch)
     {
         // Fill whole rect at once
-        self->write(self->scratchData, scratchSizeB, self->userPtr);
+        self->write(self->scratchData, xferCount * self->bpp, self->userPtr);
     }
     else
     {
