@@ -100,6 +100,12 @@ void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned
 int wgfxDrawTextMono(WGFXscreen *self, const char *string, unsigned length, unsigned *x, unsigned *y,
                      const WGFXmonoFont *font, unsigned scale, const WGFXcolor fgColor, const WGFXcolor bgColor, WGFXwrapMode wrapMode);
 
+/// Estimates the `w`idth and `h`eight of the bounding rectangle of a string as it were drawn by `wgfxDrawTextMono()`.
+/// Applies wrapping and clipping according to `wrapMode`.
+/// Note that the outputted `w` and `h` might describe a rectangle that goes beyond the screen's bounds!
+void wgfxTextBoundsMono(WGFXscreen *self, const char *string, unsigned length, unsigned x, unsigned y, unsigned *w, unsigned *h,
+                        const WGFXmonoFont *font, unsigned scale, WGFXwrapMode wrapMode);
+
 /// Draws (at most) `w * h` pixels of `image` (that is a `imgW * imgH` bitmap) to the screen, at position `x`,`y`.
 ///
 /// Data in `image` is contiguous top-to-bottom, left-to-right, `bpp` bytes per pixel.

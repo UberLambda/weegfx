@@ -6,6 +6,7 @@
 #include "weegfx/base.h"
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define MAX(x, y) (((x) >= (y)) ? (x) : (y))
 
 void wgfxFillRect(WGFXscreen *self, unsigned x, unsigned y, unsigned w, unsigned h, const WGFXcolor color)
 {
@@ -375,4 +376,63 @@ void wgfxDrawBitmap(WGFXscreen *self, const WGFX_U8 *image, unsigned imgW, unsig
     }
 
     self->endWrite(self->userPtr);
+}
+
+void wgfxTextBoundsMono(WGFXscreen *self, const char *string, unsigned length,
+                        unsigned x, unsigned y, unsigned *w, unsigned *h,
+                        const WGFXmonoFont *font, unsigned scale, WGFXwrapMode wrapMode)
+{
+    length = (length == 0) ? stringLength(string) : length;
+    const char *const stringEnd = string + length;
+
+    const unsigned charWidth = font->width * scale, lineHeight = font->height * scale;
+
+    if(!(wrapMode & (WGFX_WRAP_NEWLINE | WGFX_WRAP_RIGHT)))
+    {
+        // Fast-track
+        *w = charWidth * length;
+        *h = lineHeight;
+        return;
+    }
+
+    const unsigned startX = x, startY = y;
+    unsigned maxX = startX;
+
+#ifndef WGFX_NO_CLIPPING
+    if(startX >= self->width || startY >= self->height)
+    {
+        *w = *h = 0;
+        return;
+    }
+#endif
+
+    for(const char *ch = string; ch < stringEnd; ch++)
+    {
+        if(*ch == '\n' && (wrapMode & WGFX_WRAP_NEWLINE))
+        {
+            x = startX;
+            y += lineHeight;
+        }
+        else if(x >= self->width && (wrapMode & WGFX_WRAP_RIGHT))
+        {
+            maxX = self->width;
+            x = startX;
+            y += lineHeight;
+        }
+        else
+        {
+            x += charWidth;
+            maxX = MAX(x, maxX);
+        }
+    }
+    y += lineHeight;
+
+    *h = y - startY;
+
+#ifndef WGFX_NO_CLIPPING
+    *w = MIN(maxX - startX, self->width - startX);
+    *h = MIN(*h, self->height - startY);
+#else
+    *w = maxX - startX;
+#endif
 }
