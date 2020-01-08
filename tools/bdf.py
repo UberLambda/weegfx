@@ -4,17 +4,11 @@ weegfx/tools/bdf.py: BDF font format parsing
 Copyright (c) 2019 Paolo Jovon <paolo.jovon@gmail.com>
 Released under the 3-clause BSD license (see LICENSE)
 """
+
 import os
 import sys
 import re
 from typing import TextIO, Iterable, Any, Callable
-
-def nextline(stream: TextIO) -> str:
-    """Returns the next non-whitespace line in `stream` (stripped) or an empty line on EOF."""
-    line = stream.readline()
-    while line.isspace() or line.startswith('COMMENT'):
-        line = stream.readline()
-    return line.strip()
 
 
 def bdf_width(width: int) -> int:
@@ -22,6 +16,14 @@ def bdf_width(width: int) -> int:
     # NOTE: Lines in BDF BITMAPs are always stored in multiples of 8 bits
     # (https://stackoverflow.com/a/37944252)
     return -((-width) // 8) * 8
+
+
+def nextline(stream: TextIO) -> str:
+    """Returns the next non-whitespace line in `stream` (stripped) or an empty line on EOF."""
+    line = stream.readline()
+    while line.isspace() or line.startswith('COMMENT'):
+        line = stream.readline()
+    return line.strip()
 
 
 class BdfBitmap:
