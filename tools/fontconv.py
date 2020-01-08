@@ -8,73 +8,14 @@ Released under the 3-clause BSD license (see LICENSE)
 
 import os
 import sys
-import re
-from collections import namedtuple
 from argparse import ArgumentParser
-from typing import TextIO, Iterable, List, Any, Callable
+from typing import TextIO
 
 import bdf
+from font import row_width
 
 MAX_H_COL = 80
 """Maximum column when generating the .h, after which to wrap."""
-
-def row_width(width: int) -> int:
-    """Calculates the width in bits of each row in a font from the actual witdth of a character in pixels."""
-    # NOTE: Lines in font bitmaps are always to be stored in multiples of 8 bits
-    # (https://stackoverflow.com/a/37944252)
-    return -((-width) // 8) * 8
-
-BBox = namedtuple('BBox', 'w h ox oy')
-"""The bounding box of a font's characters (width / height / origin X / origin Y)."""
-
-class BdfFont:
-    """A font loaded from a "BDF"."""
-
-    def __init__(self, record: bdf.BdfRecord):
-        """Inits the font given its FONT record."""
-
-        if record.type != 'FONT':
-            raise ValueError('Expected a FONT record in BDF')
-        if len(record.children) < 1 or record.children[0].type != 'PROPERTIES':
-            raise ValueError('Expected a PROPERTIES record in BDF')
-        properties = record.children[0]
-
-        def getval(record, key, default):
-            return record.items.get(key, (default,))[0]
-
-        self.bbox = BBox._make(record.items['FONTBOUNDINGBOX'])
-        """The font's bounding box (W / H / OX / OY)."""
-
-        self.family = getval(properties, 'FAMILY_NAME', None)
-        """Name of the font's family."""
-        self.weight = getval(properties, 'WEIGHT_NAME', None)
-        """Name of the font's weight."""
-        self.logical_name = getval(record, 'FONT', None)
-        """Logical (PostScript) name of the font."""
-        self.copyright = getval(properties, 'COPYRIGHT', None)
-        """Copyright info on the font."""
-
-        # Table for faster lookups
-        self._chars = {child.items['ENCODING'][0]: child
-                       for child in record.children if child.type == 'CHAR'}
-
-
-    def render_char(self, code: int) -> List:
-        """Renders the character with the given code to a list of bytes.
-        (`n` bytes per row, left-to-right, top-to-bottom).
-
-        Returns `None` if the character is missing from the font."""
-
-        char_record = self._chars.get(code, None)
-        if not char_record:
-            return None
-
-        char_bbox = char_record.items['BBX']
-        if char_bbox[0] != self.bbox.w or char_bbox[1] != self.bbox.h:
-            raise ValueError(
-                f'Character {code} has wrong BBX, font is not monospace!')
-
-        return char_record.items['BITMAP'].data
 
 
 def emit_mono_font_header(font: 'Font', first_ch: int, last_ch: int, stream: TextIO):
@@ -148,11 +89,11 @@ static const WGFXmonoFont {h_varname} WGFX_RODATA = {{
 
 if __name__ == '__main__':
     argp = ArgumentParser(
-        description="Converts a BDF font to a C header suitable for weegfx")
+        description="Converts a font to a C header suitable for weegfx")
     argp.add_argument('-o', '--outfile', type=str, required=False,
                       help="The file to output to (optional; defaults to stdout)")
     argp.add_argument('infile', type=str,
-                      help='The BDF file to convert')
+                      help='The font file to convert')
     argp.add_argument('firstch', type=int,
                       help="First character of the range of characters to output (inclusive)")
     argp.add_argument('lastch', type=int,
@@ -164,5 +105,5 @@ if __name__ == '__main__':
         outfile = open(args.outfile, 'w') if args.outfile else sys.stdout
         with outfile:
             record = bdf.BdfRecord.parse_from(infile, 'FONT')
-            font = BdfFont(record)
+            font = bdf.BdfFont(record)
             emit_mono_font_header(font, args.firstch, args.lastch, outfile)
