@@ -17,6 +17,11 @@ from font import row_width
 MAX_H_COL = 80
 """Maximum column when generating the .h, after which to wrap."""
 
+FONT_MAKERS = {
+    '.bdf': lambda infile: bdf.BdfFont(bdf.BdfRecord.parse_from(infile, 'FONT')),
+}
+"""Maps file extensions to a callable that, when invoked with a font's file input stream, builds a Font."""
+
 
 def emit_mono_font_header(font: 'Font', first_ch: int, last_ch: int, stream: TextIO):
     """Outputs a weegfx C header file storing a character range (`start_ch`..`end_ch`, both inclusive)
@@ -92,6 +97,8 @@ if __name__ == '__main__':
         description="Converts a font to a C header suitable for weegfx")
     argp.add_argument('-o', '--outfile', type=str, required=False,
                       help="The file to output to (optional; defaults to stdout)")
+    argp.add_argument('-H', '--height', type=int, required=False,
+                      help="The size in pixels of the font to render (mandatory for vector fonts; ignored for bitmap fonts)")
     argp.add_argument('infile', type=str,
                       help='The font file to convert')
     argp.add_argument('firstch', type=int,
@@ -101,9 +108,17 @@ if __name__ == '__main__':
 
     args = argp.parse_args()
 
+    if not os.path.isfile(args.infile):
+        raise RuntimeError(f"Invalid font file: {infile}")
+
+    no_ext, ext = os.path.splitext(args.infile)
+    try:
+        font_maker = FONT_MAKERS[ext]
+    except KeyError:
+        raise RuntimeError(f"Unknown font file type: {ext}")
+
     with open(args.infile, 'r') as infile:
         outfile = open(args.outfile, 'w') if args.outfile else sys.stdout
         with outfile:
-            record = bdf.BdfRecord.parse_from(infile, 'FONT')
-            font = bdf.BdfFont(record)
+            font = font_maker(infile)
             emit_mono_font_header(font, args.firstch, args.lastch, outfile)
