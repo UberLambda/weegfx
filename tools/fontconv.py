@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# coding: utf-8
 """
 weegfx/tools/fontconv.py: Converts monospaced fonts to C header files suitable for weegfx.
 
@@ -14,13 +15,34 @@ from typing import TextIO
 import bdf
 from font import row_width
 
-MAX_H_COL = 80
-"""Maximum column when generating the .h, after which to wrap."""
+
+def bdf_maker(args) -> 'Font':
+    """Loads a BDF font given its path and expected width in pixels (`None` to ignore)."""
+
+    with open(args.infile, 'r') as infile:
+        record = bdf.BdfRecord.parse_from(infile, 'FONT')
+
+    if args.width and record.bbox.w != width:
+        raise ValueError(f'Expected a font of width {width}px, but loaded one of width {record.bbox.w}px')
+    return bdf.BdfFont(record)
+
 
 FONT_MAKERS = {
-    '.bdf': lambda infile: bdf.BdfFont(bdf.BdfRecord.parse_from(infile, 'FONT')),
+    '.bdf': bdf_maker,
 }
-"""Maps file extensions to a callable that, when invoked with a font's file input stream, builds a Font."""
+"""Maps file extensions to a callable that, when invoked with a font's filepath, builds a Font."""
+
+try:
+    from ftfont import FTFont
+    ftfont_maker = lambda args: FTFont(args.infile, width=args.width, dpi=args.dpi)
+    FONT_MAKERS['.ttf'] = ftfont_maker
+    FONT_MAKERS['.otf'] = ftfont_maker
+except ImportError:
+    raise RuntimeWarning("Install `freetype-py` and `numpy` for OTF and TTF font support!")
+
+
+MAX_H_COL = 80
+"""Maximum column when generating the .h, after which to wrap."""
 
 
 def emit_mono_font_header(font: 'Font', first_ch: int, last_ch: int, stream: TextIO):
@@ -60,13 +82,13 @@ static const WGFX_U8 {h_varname}_DATA[{h_data_size}] WGFX_RODATA = {{"""
 
     for ich in range(first_ch, last_ch + 1):
         char_bitmap = font.render_char(ich)
-        if not char_bitmap:
+        if char_bitmap is None:
             print(f'Character {ich} missing, zero-filling pixel data',
                   file=sys.stderr)
             char_bitmap = empty_char_bitmap
 
         print(
-            f'    // {hexbyte(ich)} {repr(chr(ich))}{" (MISSING)" * (char_bitmap == empty_char_bitmap)}', end='', file=stream)
+            f'    // {hexbyte(ich)} {repr(chr(ich))}{" (MISSING)" * (char_bitmap is empty_char_bitmap)}', end='', file=stream)
 
         h_col = MAX_H_COL
         for byte in char_bitmap:
@@ -80,7 +102,7 @@ static const WGFX_U8 {h_varname}_DATA[{h_data_size}] WGFX_RODATA = {{"""
         print('', file=stream)
 
     h_end = f"""}};
-    
+
 static const WGFXmonoFont {h_varname} WGFX_RODATA = {{
     {font.bbox.w}, {font.bbox.h},
     {hexbyte(first_ch)}, {hexbyte(last_ch)},
@@ -97,8 +119,10 @@ if __name__ == '__main__':
         description="Converts a font to a C header suitable for weegfx")
     argp.add_argument('-o', '--outfile', type=str, required=False,
                       help="The file to output to (optional; defaults to stdout)")
-    argp.add_argument('-H', '--height', type=int, required=False,
+    argp.add_argument('-w', '--width', type=int, required=False,
                       help="The size in pixels of the font to render (mandatory for vector fonts; ignored for bitmap fonts)")
+    argp.add_argument('-D', '--dpi', type=int, required=False, default=300,
+                      help="Target dots-per-inch when rendering the font (ignored for non-vector fonts)")
     argp.add_argument('infile', type=str,
                       help='The font file to convert')
     argp.add_argument('firstch', type=int,
@@ -117,8 +141,7 @@ if __name__ == '__main__':
     except KeyError:
         raise RuntimeError(f"Unknown font file type: {ext}")
 
-    with open(args.infile, 'r') as infile:
-        outfile = open(args.outfile, 'w') if args.outfile else sys.stdout
-        with outfile:
-            font = font_maker(infile)
-            emit_mono_font_header(font, args.firstch, args.lastch, outfile)
+    outfile = open(args.outfile, 'w') if args.outfile else sys.stdout
+    with outfile:
+        font = font_maker(args)
+        emit_mono_font_header(font, args.firstch, args.lastch, outfile)
