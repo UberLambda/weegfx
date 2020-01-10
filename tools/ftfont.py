@@ -26,15 +26,12 @@ class FTFont:
         ft_size = 1.0
         for i in range(max_iters):
             self._font.set_char_size(int(math.ceil(ft_size * 64)), 0, dpi, 0)
-            self._font.load_char('M', ft.FT_LOAD_RENDER | ft.FT_LOAD_TARGET_MONO)
-
-            bmp = self._font.glyph.bitmap
-            glyph_width = self._font.glyph.metrics.horiAdvance // 64
+            glyph_width = self._font.size.max_advance // 64
             if glyph_width == width:
                 break
             ft_size *= width / glyph_width
 
-        line_height = self._font.size.height // 64  # (scaled px height)
+        line_height = (self._font.size.ascender - self._font.size.descender) // 64  # (scaled px height)
         return (glyph_width, line_height)
         
 
@@ -49,7 +46,7 @@ class FTFont:
         #        A better approach would be to always estimate at a loss and add padding columns if needed
         width, height = self._guesstimate_size(width, dpi)
         ox = 0  # TODO: Use horiBearingX of the capital M?
-        oy = -abs(self._font.descender) // 64
+        oy = self._font.descender // 64
 
         self.bbox = BBox(w=width, h=height, ox=ox, oy=oy)
         """The font's bounding box (W / H / OX / OY)."""
@@ -84,23 +81,14 @@ class FTFont:
         sx = glyph.bitmap_left  # quad left -> glyph left
         ex = sx + glyph.bitmap.width
 
-        # Clip excess rows/cols out of the bottom/right edge of the glyph bitmap.
-        # Prefer clipping any empty space at the left and top of the char!
-        # TODO: Investigate why this is required (precision errors from FreeType hinting?)
-        w_over = (ex - sx) - self.bbox.w
-        if w_over > 0:
-            sx -= w_over  # Clip left
-            if sx < 0:
-                ex -= sx  # Clip right
-                sx = 0
-                ex = min(ex, self.bbox.w)
-        h_over = (ey - sy) - self.bbox.h
-        if h_over > 0:
-            sy -= h_over  # Clip top
-            if sy < 0:
-                ey -= sy # Clip bottom
-                sy = 0
-                ey = min(ey, self.bbox.h)
+        # FIXME
+        if ex > self.bbox.w:
+            print(f"{chr(code)}: clipped {ex - self.bbox.w}px right", file=sys.stderr)
+            ex = self.bbox.w
+        if ey > self.bbox.h:
+            print(f"{chr(code)}: clipped {ey - self.bbox.h}px bottom", file=sys.stderr)
+            ey = self.bbox.h
+        #print('oy', self.bbox.oy, 'sy', sy, 'ey', ey, 'sx', sx, 'ex', ex)
 
         out_bmp[sy:ey, sx:ex] = glyph_bmp[:(ey - sy), :(ex - sx)]
 
