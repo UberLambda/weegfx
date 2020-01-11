@@ -67,7 +67,7 @@ class FTFont:
 
         Returns `None` if the character is missing from the font."""
 
-        self._font.load_char(code)
+        self._font.load_char(code, ft.FT_LOAD_RENDER | ft.FT_LOAD_TARGET_MONO)  #< !!
         # FIXME: Return None if glyph could not be loaded properly
         glyph = self._font.glyph
 
