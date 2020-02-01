@@ -1,5 +1,5 @@
 # weegfx
-**A simple C99 graphics library for embedded systems, where the whole framebuffer won't fit in SRAM.**
+**A simple, platform-agnostic C99 graphics library for embedded systems, where the whole framebuffer won't fit in SRAM.**
 
 The library is split into:
 - A [software-rendering core](src/), that is as platform-agnostic as possible (it theoretically only requires a working C99 compiler)
